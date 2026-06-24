@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "geospoof"
+version = "0.1.0"
+description = "One-command location + IP spoofing CLI for iOS testing"
+requires-python = ">=3.11,<4"
+dependencies = [
+    "click>=8.1",
+    "requests>=2.31",
+    "pymobiledevice3>=4.0",
+    "geonamescache>=2.0",
+    "timezonefinder>=6.2",
+    "babel>=2.14",
+    "rich>=13.0",
+    "structlog>=25.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+    "mypy>=1.10",
+]
+
+[project.scripts]
+geospoof = "geospoof.cli:cli"
+tunneld = "pymobiledevice3.cli.remote:cli"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+src = ["src", "tests"]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+# class iOSDevice keeps its conventional Apple casing; argparse-style names ok
+ignore = ["N801"]
+
+[tool.ruff.lint.per-file-ignores]
+# console.py holds long Rich-markup UI strings that don't wrap cleanly
+"src/geospoof/console.py" = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_unused_ignores = true
