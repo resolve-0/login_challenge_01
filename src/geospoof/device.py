@@ -25,6 +25,8 @@ class iOSDevice:
         self._rsd: Any = None     # already-connected RSD from tunneld (iOS 17+)
         self._ios_version: str = ""
         self._device_name: str = ""
+        self._dvt: Any = None              # held-open DVT session — see set_location
+        self._location_sim: Any = None     # LocationSimulation bound to _dvt
 
     def _is_ios17_plus(self) -> bool:
         return int(self._ios_version.split(".")[0]) >= 17
@@ -100,14 +102,32 @@ class iOSDevice:
         return self._lockdown
 
     def set_location(self, lat: float, lng: float) -> None:
-        """Set GPS coordinates on the device."""
-        with DvtSecureSocketProxyService(lockdown=self.service_provider) as dvt:
-            LocationSimulation(dvt).set(lat, lng)
+        """Set GPS coordinates on the device.
+
+        iOS keeps the simulated fix only while the DVT instruments connection
+        stays open (the same way Xcode's *Simulate Location* holds the channel).
+        So the session is opened once and held until clear_location() — closing
+        it would make CoreLocation revert to the real GPS fix immediately.
+        """
+        if self._dvt is None:
+            self._dvt = DvtSecureSocketProxyService(lockdown=self.service_provider)
+            self._dvt.perform_handshake()
+            self._location_sim = LocationSimulation(self._dvt)
+        self._location_sim.set(lat, lng)
 
     def clear_location(self) -> None:
-        """Reset GPS to the real location."""
-        with DvtSecureSocketProxyService(lockdown=self.service_provider) as dvt:
-            LocationSimulation(dvt).clear()
+        """Reset GPS to the real location and close the held DVT session."""
+        try:
+            if self._location_sim is not None:
+                self._location_sim.clear()
+        finally:
+            if self._dvt is not None:
+                try:
+                    self._dvt.close()
+                except Exception:
+                    pass
+            self._dvt = None
+            self._location_sim = None
 
     def disable_wifi(self) -> None:
         """Turn off WiFi on the connected iPhone."""
